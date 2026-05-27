@@ -15,4 +15,5 @@
 	<filesToOpen value="main.c"/>
 	<isTargetManual value="false"/>
 	<connection value="common/targetdb/connections/TIXDS100usb_Connection.xml"/>
+	<activeTargetConfiguration value="targetConfigs/TMS320F28335.ccxml"/>
 </projectOptions>
