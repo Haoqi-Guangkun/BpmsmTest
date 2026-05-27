@@ -19,6 +19,7 @@
 //test10: 2026年4月29日，转矩部分，降低转速采样和转速环计算频率，为1Khz
 //test11: 2026年4月30日，重新调整悬浮系统位移环、电流环参数，转速可稳定运行在 3100 RPM，但伴随一些噪声
 //test0527test for git [pushone]
+//test two
 
 #include "DSP2833x_Device.h"    // DSP2833x芯片寄存器定义头文件
 #include "DSP2833x_Examples.h"  // DSP2833x例程通用函数头文件
