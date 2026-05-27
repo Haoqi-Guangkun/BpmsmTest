@@ -1,26 +1,27 @@
-﻿Debug/
-Release/
-.settings/
-.launches/
-.ccsproject
-.cproject
-.project
-*.obj
-*.d
-*.map
+﻿# CCS/编译产物
+Debug*/
+Release*/
 *.out
-*.hex
-*.bin
-*.a
+*.map
+*.obj
+*.o
+*.d
+*.dep
+*.lst
 *.lib
-ccsObjs.opt
-makefile
-objects.mk
-sources.mk
-subdir_rules.mk
-subdir_vars.mk
-*_linkInfo.xml
-Thumbs.db
-Desktop.ini
-.DS_Store
-targetConfigs/*.ccxml
+*.a
+*.mk
+*.tmp
+*.log
+
+# 生成的汇编/中间文件
+*.asm
+*.src
+
+# 必要文件请保留（不要忽略）
+!*.cmd        # 链接命令文件通常需要纳入版本库
+!.project
+!.cproject
+!.ccsproject
+!.launches/
+!targetConfigs/
