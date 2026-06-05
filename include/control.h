@@ -1,7 +1,7 @@
 /*
  * control.h
  *
- *  Created on: 2026Äê3ÔÂ16ÈÕ
+ *  Created on: 2026ï¿½ï¿½3ï¿½ï¿½16ï¿½ï¿½
  *      Author: L.YF
  */
 
@@ -13,26 +13,27 @@
 #include "park.h"
 #include "ipark.h"
 #include "pid_reg.h"
+#include "UFC.h"
 
-// ºê¶¨Òå
+// ï¿½ê¶¨ï¿½ï¿½
 #define PI 3.14159265358979f
 #define PI2 6.28318530717958f
 #define INV_PI2 0.159154943091896f			 // 1/(2*pi)
 #define ISR_FREQ    10000.0f                 // 10kHz
-#define POLE_PAIRS          1.0f             // ×ª¾ØÈÆ×é¼«¶ÔÊý
-#define CURRENT1_SCALE      -2.5f            // ×ª¾ØµçÑ¹×ªµçÁ÷ÏµÊý£º10/4, I = (V - Offset) * SCALE
-#define CURRENT2_SCALE      -3.3333333333f   // Ðü¸¡µçÑ¹×ªµçÁ÷ÏµÊý£º10/3
-#define VOLTAGE_SCALE       10.0f            // Ä¸ÏßµçÑ¹×ª»»ÏµÊý£º10/1
-#define SENSOR_POS_SCALE    0.0004f          // ÎÐÁ÷´«¸ÐÆ÷µçÑ¹×ªÎ»ÒÆ(mm)ÏµÊý£¬´ýµ÷Õû£¡£¡£¡
+#define POLE_PAIRS          1.0f             // ×ªï¿½ï¿½ï¿½ï¿½ï¿½é¼«ï¿½ï¿½ï¿½ï¿½
+#define CURRENT1_SCALE      -2.5f            // ×ªï¿½Øµï¿½Ñ¹×ªï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½10/4, I = (V - Offset) * SCALE
+#define CURRENT2_SCALE      -3.3333333333f   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¹×ªï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½10/3
+#define VOLTAGE_SCALE       10.0f            // Ä¸ï¿½ßµï¿½Ñ¹×ªï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½10/1
+#define SENSOR_POS_SCALE    0.0004f          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¹×ªÎ»ï¿½ï¿½(mm)Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-// ÎÞÖá³Ðµç»ú²¿·Ö²ÎÊý¶¨Òå (Á¦-µçÁ÷½âñîÊ¹ÓÃ)
-#define MOTOR_L1Q    0.0019f       // ×ª¾ØÈÆ×é q Öáµç¸Ð (H)
-#define MOTOR_PHI_F  0.0252f       // ÓÀ´ÅÌåµÈÐ§´ÅÁ´ (Wb)
-#define MOTOR_KM     311.0f        // Ðü¸¡Á¦ñîºÏÏµÊý Km
-// Ô¤ÏÈ¼ÆËã´ÅÁ´µÄÆ½·½£¬½ÚÊ¡ DSP ËãÁ¦
+// ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½Ö²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½-ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½)
+#define MOTOR_L1Q    0.0019f       // ×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ q ï¿½ï¿½ï¿½ï¿½ (H)
+#define MOTOR_PHI_F  0.0252f       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½ (Wb)
+#define MOTOR_KM     311.0f        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ Km
+// Ô¤ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¡ DSP ï¿½ï¿½ï¿½ï¿½
 #define MOTOR_PHI_F_SQ  (MOTOR_PHI_F * MOTOR_PHI_F)
 
-// ¶¨ÒåÒ»¸ö½á¹¹ÌåÀ´±£´æADC×ª»»ºóµÄÎïÀíÁ¿
+// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½á¹¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ADC×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 typedef struct
 {
     // --- ADCINA Group (0-7) ---
@@ -42,23 +43,23 @@ typedef struct
     float Filtered_A;       // ADCINA3
     float Filtered_B;       // ADCINA4
     float Filtered_C;       // ADCINA5
-    float ADC_VT;           // ADCINA6 (Ä¸ÏßµçÑ¹)
+    float ADC_VT;           // ADCINA6 (Ä¸ï¿½ßµï¿½Ñ¹)
     float ADC_VS;           // ADCINA7
 
     // --- ADCINB Group (0-7) ---
     float Hall_A;           // ADCINB0
     float Hall_B;           // ADCINB1
     float Hall_C;           // ADCINB2
-    float Eddy_C;           // ADCINB3 (ÎÐÁ÷´«¸ÐÆ÷)
+    float Eddy_C;           // ADCINB3 (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
     float Eddy_B;           // ADCINB4
     float Eddy_A;           // ADCINB5
 
 } AdcData_t;
 
-// È«¾Ö±äÁ¿ÉùÃ÷£¬¹©Íâ²¿µ÷ÓÃ
+// È«ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½ï¿½ï¿½ï¿½
 extern AdcData_t g_AdcData;
 
-// º¯ÊýÔ­ÐÍÉùÃ÷
+// ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 float one_order_LPF(float cutoff_fre, float input, Uint16 i);
 float Speed_Filter(float input);
 void Read_Adc(void);
