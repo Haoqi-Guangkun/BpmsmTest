@@ -1,4 +1,4 @@
-# CCS/编译产物
+# CCS/编译产物（这些文件夹里已经包含了编译器生成的中间 .asm 和 .src，所以安全）
 Debug*/
 Release*/
 *.out
@@ -14,9 +14,9 @@ Release*/
 *.tmp
 *.log
 
-# 生成的汇编/中间文件
-*.asm
-*.src
+# ======= 修改这里：放行真正作为源码的汇编文件 =======
+# 删掉全局的 *.asm 阻断，改用特定的白名单，或者干脆不理会
+# 因为源文件里的 .asm 是我们需要的，生成的 .asm 都在 Debug 文件夹里
 
 # 必要文件请保留（不要忽略）
 !*.cmd        # 链接命令文件
@@ -27,21 +27,16 @@ Release*/
 !targetConfigs/
 
 # ==================== 增强忽略 ====================
-# 系统缓存
 .DS_Store
 Thumbs.db
 Desktop.ini
-
-# 编辑器/工具缓存
 .vscode/
 .idea/
 .clangd
 .claude/
 .theia/
 .mcp.json
-
-# 其他临时文件
 *.bak
 *.swp
-*.swo
+*.o
 *~
