@@ -2,7 +2,7 @@
 
 基于 TI TMS320F28335 DSP 的无刷永磁同步电机 (Brushless Permanent Magnet Synchronous Motor) 控制项目，使用 Code Composer Studio (CCS) 开发。
 
-## 项目结构
+## 项目结构[基本框架]
 
 ```
 BpmsmTest/
@@ -47,6 +47,7 @@ BpmsmTest/
 3. 在 CCS 中 `File → Import → CCS Projects` 导入项目
 4. 编译并下载到 TMS320F28335 目标板
 
-## 协作方式
-
-本项目采用 **Fork + Pull Request** 工作流，4 位开发者各自拥有个人仓库。
+## 版本说明
+main分支是本工程能实现基本功能的代码
+V2.0在基础工程上加入了SCI串口通信，能够监视电机相关信息
+V3.0在2.0基础上加入前馈补偿模块，能够在高速运行下实现功能。
