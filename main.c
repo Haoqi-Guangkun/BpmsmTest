@@ -90,6 +90,7 @@ extern PARK park_eddy;
 extern float Speed_Target_Ramp;
 extern float Speed_Fdb_rpm;
 extern float Pos_D_Filtered;
+extern float Force_D_Ref;
 extern float Raw_Hall_Theta_rad; // 反正切计算角度
 extern float ElecTheta_rad;      // 电角度
 
@@ -183,25 +184,23 @@ void main(void) {
   EINT;  // 开启 CPU 全局中断
   ERTM;  // 开启实时调试中断支持
 
-  while(1) {
-// 检查中断是否送来了新采样
-        if (gUnbalanceComp.NewData_Flag == 1)
-        {
-            // 进来后立刻把标志位清零，防止重复计算
-            gUnbalanceComp.NewData_Flag = 0; 
-            
-            // 在这里安心、大胆地运行繁重的前馈算法
-            // 即使它被位置环中断中途打断 3~4 次，也完全不会对中断的实时性造成任何威胁！
-            Unbalance_Comp_Run(&gUnbalanceComp, 
-                               gUnbalanceComp.x_raw_buf, 
-                               gUnbalanceComp.y_raw_buf, 
-                               gUnbalanceComp.theta_buf);
+  while (1) {
+    // 检查中断是否送来了新采样
+    if (gUnbalanceComp.NewData_Flag == 1) {
+      // 进来后立刻把标志位清零，防止重复计算
+      gUnbalanceComp.NewData_Flag = 0;
 
-    // SCI串口数据发送
-    x = SCI_GetOverflowCount(); // 检测串口接收/发送溢出计数
-    SCI_ServiceTx(); // 执行串口发送服务函数，负责将缓冲区数据发出
+      // 在这里安心、大胆地运行繁重的前馈算法
+      // 即使它被位置环中断中途打断 3~4
+      // 次，也完全不会对中断的实时性造成任何威胁！
+      Unbalance_Comp_Run(&gUnbalanceComp, gUnbalanceComp.x_raw_buf,
+                         gUnbalanceComp.y_raw_buf, gUnbalanceComp.theta_buf);
+
+      // SCI串口数据发送
+      x = SCI_GetOverflowCount(); // 检测串口接收/发送溢出计数
+      SCI_ServiceTx();            // 执行串口发送服务函数，负责将缓冲区数据发出
+    }
   }
-}
 }
 
 // ================= 中断服务程序（10kHz 核心闭环控制环） =================
@@ -220,8 +219,8 @@ interrupt void adc_isr(void) {
     j = 0;
     float32 tx_data[3];
     tx_data[0] = park_eddy.Ds;      // 待观测变量1: 如电涡流转换后的D轴位移反馈
-    tx_data[1] = park_eddy.Qs;      // 待观测变量2: 目标位移/转矩分量
-    tx_data[2] = Speed_Target_Ramp; // 待观测变量3: 斜坡转速给定值
+    tx_data[1] = gUnbalanceComp.Fx_out;      // 待观测变量2: 目标位移/转矩分量
+    tx_data[2] = Force_D_Ref; // 待观测变量3: 斜坡转速给定值
     SendFloatArray_JustFloat(tx_data,
                              3U); /* 通过串口发送浮点数数组给上位机波形软件 */
   }
@@ -273,4 +272,3 @@ interrupt void adc_isr(void) {
   PieCtrlRegs.PIEACK.all =
       PIEACK_GROUP1; // 向 PIE 模块发送 ACK 响应，允许接收第一组后续的中断请求
 }
-

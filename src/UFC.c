@@ -2,19 +2,20 @@
 #include "control.h"
 #include <math.h>
 
-
 #define PI_TWO 6.283185307f
 
 /**
- * @brief 不平衡前馈补偿运行主函数（在ADC中断中调用）
+ * @brief 不平衡前馈补偿运行主函数（在主函数中断中调用）
  */
 void Unbalance_Comp_Run(UFC *p, float32 x_raw, float32 y_raw,
                         float32 theta_hall) {
+
   float32 sin_theta = sinf(theta_hall);
   float32 cos_theta = cosf(theta_hall);
   float32 x_hat, y_hat; // SPU处理结果
 
   // 1. 根据霍尔反馈的实际转速，实时更新采样点数
+  // 只有有转速的时候才会判断
   if (p->omega_r > 1.0f) {
     p->spu_x.N_samples = (Uint32)(PI_TWO / (p->omega_r * p->Ts));
     p->spu_y.N_samples = p->spu_x.N_samples;

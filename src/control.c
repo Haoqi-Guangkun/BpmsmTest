@@ -13,7 +13,7 @@
 #define FILTER_SIZE                                                            \
   10 // 窗口大小 10~20 效果最好；越大滤波效果越好，但是相位滞后越严重
 
-// 内部动态变量
+// 内部变量
 static Uint32 Align_Counter = 0; // 预定位时间计数器
 // 角度相关变量
 float Raw_Hall_Theta_rad = 0.0f; // 霍尔传感器计算得到的原始电角度（弧度值）
@@ -52,6 +52,7 @@ volatile MOTOR_MODE MotorMode = MODE_RUN; // 默认工作模式设为：闭环�
 extern float Speed_Ref_rpm;        // 外部设定的目标理想转速 (RPM)
 static float Speed_Raw_rpm = 0.0f; // 差分得到的瞬时转速（未滤波，噪声大）
 float Speed_Fdb_rpm = 0.0f;        // 滤波后的实际反馈转速 (RPM)
+static float Speed_Fdb_rad= 0.0f;        // 滤波后的实际反馈转速 (rad)
 // 转速斜坡（Ramp）发生器变量（防止给定阶跃导致电流过载）
 float Speed_Target_Final = 1000.0f; // 最终期望达到的目标转速 (RPM)
 float Speed_Target_Ramp = 0.0f; // 当前斜坡指令转速 (作为速度环当前的实际 Ref)
@@ -63,13 +64,15 @@ static Uint16 Speed_Loop_Cnt =
 // 悬浮位置控制变量
 float Pos_D_Filtered = 0.0f,
       Pos_Q_Filtered = 0.0f; // 经低通滤波后的 d 轴和 q 轴实际悬浮位置反馈
-static float Force_D_Ref = 0.0f,
-             Force_Q_Ref = 0.0f; // 位置环 PID 算出的目标悬浮力给定值
+float Force_D_Ref = 0.0f,
+      Force_Q_Ref = 0.0f; // 位置环 PID 算出的目标悬浮力给定值
 static float i_Bd_ref = 0.0f,
              i_Bq_ref = 0.0f; // 换算得到的目标悬浮 d/q 轴控制电流
 
 // 悬浮同频补偿控制标志
 volatile Uint16 UFC_flag = 0; // 不平衡补偿标志
+volatile Uint16 sgn_plus = 0; // 补偿符号
+volatile float K_UFC = 0.0f;  // 补偿增益
 // 变换器结构体实例（双控制回路：环1通常用于驱动旋转，环2/eddy通常用于悬浮）
 CLARK clark1 = CLARK_DEFAULTS;
 PARK park1 = PARK_DEFAULTS;
@@ -356,7 +359,7 @@ void Control_Suspension(void) {
   gSuspPosD_PID.Fdb = park_eddy.Ds; // 采用电涡流变换后的 D 轴实际位移反馈值
   gSuspPosD_PID.calc(&gSuspPosD_PID);
   // Force_D_Ref = -gSuspPosD_PID.Out; // 得到 D 轴期望控制力 Fd*
-  //注意引入负号构成负反馈
+  // 注意引入负号构成负反馈
 
   gSuspPosQ_PID.Ref = Pos_Q_Ref;
   gSuspPosQ_PID.Fdb = park_eddy.Qs; // 采用电涡流变换后的 Q 轴实际位移反馈值
@@ -367,7 +370,8 @@ void Control_Suspension(void) {
   // 给后台源源不断地送去最新的传感器数据（单周期赋值，不耗时）
   gUnbalanceComp.x_raw_buf = park_eddy.Ds;
   gUnbalanceComp.y_raw_buf = park_eddy.Qs;
-  gUnbalanceComp.theta_buf = ElecTheta_rad;
+  gUnbalanceComp.theta_buf = ElecTheta_rad;          // 转速电角度
+  gUnbalanceComp.omega_r = Speed_Fdb_rpm * 0.10472f; // RPM → rad/s
 
   // 触发标志位：告诉后台“新的一届中断采样到了，你可以开始算下一发了”
   gUnbalanceComp.NewData_Flag = 1;
@@ -375,12 +379,18 @@ void Control_Suspension(void) {
   if (UFC_flag == 1) {
     // 直接拿取后台计算并锁存在这里的最新出力
     // 哪怕后台还没算完新的，这里也会拿到上一次算好的、稳定的旧出力，绝不卡中断
-    Unbalance_Comp_Run(&gUnbalanceComp, park_eddy.Ds, park_eddy.Qs,
-                       ElecTheta_rad);
-    Force_D_Ref = -gSuspPosD_PID.Out -
-                  gUnbalanceComp.Fx_out; // include UFC D 轴期望控制力
-    Force_Q_Ref = -gSuspPosQ_PID.Out -
-                  gUnbalanceComp.Fy_out; // include UFC Q 轴期望控制力
+    if (sgn_plus == 1) {
+      Force_D_Ref = -gSuspPosD_PID.Out +
+                    K_UFC * gUnbalanceComp.Fx_out; // include UFC D 轴期望控制力
+      Force_Q_Ref = -gSuspPosQ_PID.Out +
+                    K_UFC * gUnbalanceComp.Fy_out; // include UFC Q 轴期望控制力
+    } else {
+      Force_D_Ref = -gSuspPosD_PID.Out -
+                    K_UFC * gUnbalanceComp.Fx_out; // include UFC D 轴期望控制力
+      Force_Q_Ref = -gSuspPosQ_PID.Out -
+                    K_UFC * gUnbalanceComp.Fy_out; // include UFC Q 轴期望控制力
+    }
+
   } else {
     Force_D_Ref = -gSuspPosD_PID.Out; // 得到 D 轴期望控制力
     Force_Q_Ref = -gSuspPosQ_PID.Out; // 得到 Q 轴期望控制力
@@ -500,9 +510,9 @@ void Control_Torque(void) {
     EPwm3Regs.TZCLR.bit.OST = 1;
     EDIS;
 
-    // 1. 转速外环分频执行与斜坡发生器（电流内环 10kHz，转速外环分频 10 倍对应
-    // 1kHz）
-    if (++Speed_Loop_Cnt >= 10) {
+    // 1. 转速外环分频执行与斜坡发生器（电流内环 10kHz，转速外环分频 5 倍对应
+    // 2kHz）
+    if (++Speed_Loop_Cnt >= 5) {
       Speed_Loop_Cnt = 0;
 
       // === A. 瞬时转速微积分计算 ===
@@ -524,7 +534,7 @@ void Control_Torque(void) {
       // 用于滤除微分带来的高频数字噪声，提供平滑的速度反馈值
       Speed_Fdb_rpm = 0.95f * Speed_Fdb_rpm + 0.05f * Speed_Raw_rpm;
       // Speed_Fdb_rpm = Speed_Filter(Speed_Raw_rpm); // 也可选择滑动平均滤波器
-
+      Speed_Fdb_rad = Speed_Fdb_rpm * 60.0f;
       // === C. 转速斜坡限制器（Ramp Function） ===
       // 限制转速指令的变化速率，防止转速设定阶跃导致速度环瞬间饱和拉出最大电流
       float error = Speed_Ref_rpm - Speed_Target_Ramp;
@@ -546,15 +556,18 @@ void Control_Torque(void) {
     gTorqCurrD_PI.Fdb = park1.Ds; // D轴驱动电流实际反馈
     gTorqCurrD_PI.calc(&gTorqCurrD_PI);
 
-    gTorqCurrQ_PI.Ref =
-        -gSpd_PI
-             .Out; // Q轴转矩电流给定来自于速度环输出的取反（根据系统电机转向定义）
+    gTorqCurrQ_PI.Ref = -gSpd_PI.Out;
+    // Q轴转矩电流给定来自于速度环输出的取反（根据系统电机转向定义）
     gTorqCurrQ_PI.Fdb = park1.Qs; // Q轴驱动电流实际反馈
     gTorqCurrQ_PI.calc(&gTorqCurrQ_PI);
 
     // 3. 驱动回路反 Park（IPARK）坐标变换
-    ipark1.Ds = gTorqCurrD_PI.Out;
-    ipark1.Qs = gTorqCurrQ_PI.Out;
+    // 加前馈解耦
+    // d轴解耦：ud = ud_PI - w_e * Lq * iq
+    // q轴解耦：uq = uq_PI + w_e * Ld * id + w_e * Flux
+    ipark1.Ds = gTorqCurrD_PI.Out - Speed_Fdb_rad * MOTOR_L1Q * park1.Qs;
+    ipark1.Qs = gTorqCurrQ_PI.Out +
+                Speed_Fdb_rad * (MOTOR_L1Q * park1.Ds + MOTOR_PHI_F);
     ipark1.Cos = park1.Cos;
     ipark1.Sin = park1.Sin;
     ipark1.calc(&ipark1);
